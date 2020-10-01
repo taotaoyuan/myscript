@@ -1,0 +1,108 @@
+````````````````
+参考https://www.jianshu.com/p/9b69823208a0
+`````````````````
+##合并左右reads用来组装
+cat J.R1.fastq.gz L.R1.fastq.gz >left.fq.gz
+cat J.R2.fastq.gz L.R2.fastq.gz >right.fq.gz
+
+##质控去低质量
+clumpify.sh in1=left.fq.gz in2=right.fq.gz out1=1.clumped.fq.gz out2=2.clumped.fq.gz pigz dedupe
+bbduk.sh in1=1.clumped.fq.gz in2=2.clumped.fq.gz out1=1.trim.fq.gz out2=2.trim.fq.gz pigz ordered qtrim=rl trimq=20 minlen=15 ecco=t maxns=5 trimpolya=10 1>>bbtool.log 2>&1
+
+##Trinity组装
+~/soft/miniconda3/bin/Trinity --seqType fq --max_memory 50G --min_kmer_cov 2 --left 1.fq.gz --right 2.fq.gz --CPU 24 --output ./A_aqu.trinity --full_cleanup
+
+## 查看一下组装果
+TrinityStats.pl A_aqu.Trinity.Trinity.fasta
+
+## busco评估完整性
+$home/spider/project/yuantao/soft/busco-3.0.2/scripts/run_BUSCO.py -i A_aqu.Trinity.Trinity.fasta -m tran -c 12 -o Aaqu -l /home/spider/data/buscodb/arthropoda_odb9
+
+## 去冗余
+cd-hit -i A_aqu.Trinity.Trinity.fasta -o ./cdhit -M 1400 -c 0.9 -T 24
+或者
+cd-hit-est -i A_aqu.Trinity.Trinity.fasta -o cdhitest.fa -c 0.95 -n 9 -M 1500 -t 12 ##cd-hit-est只是对于核酸聚类
+或者
+~/install/redundans-0.13c/redundans.py -f A_aqu.Trinity.Trinity.fasta -t 32 --log log.txt --identity 0.9 --overlap 0.8
+
+
+##再次busco评估完整性
+
+## 6. Transdecoder预测转录本ORF
+# 预测转录本最长的ORF
+$TransDecoder.LongOrfs -t ../02_cd-hit-est/cdhitest.fa 1>>transdecoder.log 2>&1
+# 建立索引
+$diamond makedb --in uniprot_sprot.fasta --db uniprot_sprot.fasta
+# BLASTP比对
+$diamond blastp -d /home/spider/data/uniprot_lib/uniprot_sprot.fasta -q ./cdhitest.fa.transdecoder_dir/longest_orfs.pep --evalue 1e-5 --max-target-seqs 1 > blastp.outfmt6
+#预测可能的编码区
+TransDecoder.Predict -t ../02_cd-hit-est/cdhitest.fa --retain_blastp_hits blastp.outfmt6
+
+
+## 7.Trinotate安装及数据库准备
+## 安装sqlite库
+perl -MCPAN -e shell
+    install DBD::SQLite
+    exit
+## sqlite3  --help
+
+mkdir Trinotate &&  cd Trinotate
+下载Trinotate和2个注释用到的数据库
+
+---网址
+https://data.broadinstitute.org/Trinity/Trinotate_v3_RESOURCES/Trinotate_v3_RESOURCES/
+---
+
+#   http://trinotate.github.io/
+#   https://github.com/Trinotate/Trinotate/releases
+wget https://github.com/Trinotate/Trinotate/archive/v3.0.1.tar.gz  -O Trinotate.v3.0.1.tar.gz 
+tar zxvf Trinotate.v3.0.1.tar.gz
+~/biosoft/Trinotate/Trinotate-3.0.1/Trinotate -h
+wget https://data.broadinstitute.org/Trinity/Trinotate_v3_RESOURCES/Pfam-A.hmm.gz
+wget https://data.broadinstitute.org/Trinity/Trinotate_v3_RESOURCES/uniprot_sprot.pep.gz
+wget https://data.broadinstitute.org/Trinity/Trinotate_v3_RESOURCES/Trinotate_v3.sqlite.gz  -O Trinotate.sqlite.gz
+gunzip Trinotate.sqlite.gz
+gunzip uniprot_sprot.pep.gz
+makeblastdb -in uniprot_sprot.pep -dbtype prot
+gunzip Pfam-A.hmm.gz
+hmmpress Pfam-A.hmm
+
+## 8.Trinotate注释
+## 功能注释
+#blast比对(比对数据库可以换成nr或者Uniref90)
+#search Trinity transcripts(我这里用的是cdhit去了一下冗余的结果)
+blastx -query ../02_cd-hit-est/cdhitest.fa -db ../../../soft/Trinotate/Trinotate-3.2.1/database/uniprot_sprot.pep -num_threads 20 -max_target_seqs 1 -outfmt 6 -evalue 1e-5 > blastx.outfmt6
+
+# search Transdecoder-predictes proteins
+blastp -query transdecoder.pep -db uniprot_sprot.pep -num_threads 8 -max_target_seqs 1 -outfmt 6 -evalue 1e-3 > blastp.outfmt6
+
+## 功能域注释 
+hmmscan --cpu 8 --domtblout TrinotatePFAM.out Pfam-A.hmm transdecoder.pep > pfam.log
+
+## 信号肽预测
+../../../soft/signalp-5.0b/bin/signalp -fasta ../03_Transdecoder/cdhitest.fa.transdecoder.pep -org euk -format short -prefix Signalp_10_short
+
+
+## 9.导入SQL数据库中
+我们需要把这些结果合并起来,因此我们需要把以下的几个结果一一进行Load到SQLite db中，在我们这个工作中的database就是Trinotate.sqlite
+
+```
+转录本和蛋白数据
+Blast的结果（这个包括蛋白比对和核酸比对的两个结果）
+HMMER比对的Pfam结果
+```
+
+## 导入蛋白和转录本结果
+$Trinotate Trinotate.sqlite init --gene_trans_map ../02_cd-hit-est/cdhitest.fa.gene_trans_map --transcript_fasta ../02_cd-hit-est/cdhitest.fa --transdecoder_pep ../03_Transdecoder/cdhitest.fa.transdecoder.pep
+
+## 导入blast，pfam等结果，最后输出一个annotation report
+$Trinotate Trinotate.sqlite LOAD_swissprot_blastp blastp.outfmt6 
+$Trinotate Trinotate.sqlite LOAD_swissprot_blastx blastx.outfmt6 
+$Trinotate Trinotate.sqlite LOAD_pfam TrinotatePFAM.out 
+$Trinotate Trinotate.sqlite LOAD_tmhmm tmhmm.out (有的话，我这里没做)
+$Trinotate Trinotate.sqlite LOAD_signalp signalp.out 
+$Trinotate Trinotate.sqlite report >trinotate_annotation_report.xls
+
+
+## eggnogmapper注释
+perl ../../../soft/eggnog-mapper/emapper.py -i ../3_cdhit/cdhitest.fa -m diamond -o Am_eggnog --cpu 30 >> eggnog.log 2>&1

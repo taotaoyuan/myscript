@@ -1,0 +1,471 @@
+## sratoolkit
+## Download and install sratoolkit
+## http://www.ncbi.nlm.nih.gov/Traces/sra/sra.cgi?view=software
+## http://www.ncbi.nlm.nih.gov/books/NBK158900/
+mkdir -p ~/biosoft && cd ~/biosoft
+mkdir sratoolkit &&  cd sratoolkit
+wget https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/2.10.8/sratoolkit.2.10.8-ubuntu64.tar.gz
+tar xzvf sratoolkit.2.10.8-ubuntu64.tar.gz
+echo "export PATH=\$PATH:/home/cqs/biosoft/sratookit/sratoolkit.2.10.8-ubuntu64/bin" >> ~/.bashrc
+source ~/.bashrc
+fastq-dump -h
+# 如果有报错如下：
+# This sra toolkit installation has not been configured.
+# Before continuing, please run: vdb-config --interactive
+# For more information, see https://www.ncbi.nlm.nih.gov/sra/docs/sra-cloud/
+
+# 参考报错信息运行代码后，退出即可
+vdb-config --interactive
+
+#  *************************************************************************************************************************************
+
+
+# CMake
+# CMake是一个跨平台的编译自动配置工具，它能够输出各种各样的makefile或者project文件，能测试编译器所支持的C++特性，类似UNIX下的automake。
+# CMake可以编译源代码、制作程式库、产生适配器(wrapper)、还可以用任意的顺序建构执行档，CMake是一个比make更高级的编译配置工具。
+mkdir -p  ~/biosoft/mybin
+echo "export PATH=\$PATH:/home/cqs/biosoft/mybin/bin" >> ~/.bashrc 
+source ~/.bashrc
+cd ~/biosoft
+mkdir cmake-3.3.2 &&  cd cmake-3.3.2
+wget http://cmake.org/files/v3.3/cmake-3.3.2.tar.gz
+tar xvfz cmake-3.3.2.tar.gz
+cd cmake-3.3.2 
+# 首次使用编译需要配置gcc，g++
+sudo apt-get update
+# build-essential这个包会安装上g++,libc6-dev,linux-libc-dev,libstdc++-dev等必须的软件和头文件
+sudo apt-get install build-essential
+# prefix选项是配置安装的路径，如果不配置该选项，安装后可执行文件默认放在/usr/local/bin，库文件默认放在/usr/local/lib，配置文件默认放在/usr/local/etc，其它的资源文件放在/usr/local/share，较为凌乱
+./configure --prefix=/home/cqs/biosoft/mybin
+make
+make install 
+
+
+#  *************************************************************************************************************************************
+
+## samtools
+## Download and install samtools
+## http://samtools.sourceforge.net/
+## http://www.htslib.org/doc/samtools.html
+cd ~/biosoft
+mkdir samtools &&  cd samtools
+wget https://github.com/samtools/samtools/archive/1.10.tar.gz
+tar xzvf 1.10.tar.gz
+cd samtools-1.10/
+./configure --prefix=/home/cqs/biosoft/mybin
+# ./configure报错解决
+# bedidx.c:33:10: fatal error: zlib.h: No such file or directory
+sudo apt-get install zlib1g-dev
+# bam_tview_curses.c:41:10: fatal error: curses.h: No such file or directory
+sudo apt-get install libncurses5-dev
+# cram/cram_io.c:53:10: fatal error: bzlib.h: No such file or directory
+sudo apt-get install libboost-all-dev
+sudo apt-get install libbz2-dev
+# cram/cram_io.c:57:10: fatal error: lzma.h: No such file or directory
+sudo apt-get install liblzma-dev
+# hfile_libcurl.c:47:10: fatal error: curl/curl.h: No such file or directory
+libcurl4-openssl-dev
+# 重新指定路径
+./configure --prefix=/home/cqs/biosoft/mybin
+make
+make install
+# echo "export PATH=\$PATH:/home/cqs/biosoft/samtools-1.10/samtools-1.10"  >> ~/.bashrc
+# source ~/.bashrc
+samtools
+
+
+#  *************************************************************************************************************************************
+
+## FastQC
+## 主页 https://www.bioinformatics.babraham.ac.uk/projects/download.html#fastqc
+# 判断系统是否安装java
+java -version
+# 安装java
+sudo apt install default-jre
+# 验证
+java -version
+cd ~/biosoft
+mkdir fastqc_v0.11.9 &&  cd fastqc_v0.11.9
+wget https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v0.11.9.zip
+unzip fastqc_v0.11.9.zip
+cd FastQC/
+chmod u+x fastqc
+echo "export PATH=\$PATH:/home/cqs/biosoft/fastQC-0.11.9/FastQC" >> ~/.bashrc
+source ~/.bashrc
+fastqc -h
+
+
+#  *************************************************************************************************************************************
+
+## multiqc
+## 方法一 
+cd ~/biosoft
+mkdir multiqc-1.9 &&  cd multiqc-1.9
+wget https://files.pythonhosted.org/packages/c8/2d/f0a6be15f861c5d165726d7afecd823ca158dff530b566379623a0e4534b/multiqc-1.9.tar.gz
+tar zxvf multiqc-1.9.tar.gz
+cd multiqc-1.9
+python setup.py install
+# 报错
+# Traceback (most recent call last):
+# File "setup.py", line 24, in <module>
+# from setuptools import setup, find_packages
+# ImportError: No module named setuptools
+# python2环境下安装setuptools
+sudo apt-get install python-setuptools
+# python3环境下安装setuptools
+sudo apt-get install python3-setuptools
+# 再次执行安装
+python setup.py install
+
+-------------------------------------------------------------------------------------
+
+## 方法二
+# https://www.runoob.com/w3cnote/python-pip-install-usage.html
+cd ~/biosoft
+mkdir multiqc-1.9 && cd multiqc-1.9
+# -t指定当前安装路径，-i指定清华源
+pip install -t ./  -i https://pypi.tuna.tsinghua.edu.cn/simple multiqc
+# 接下来就是一连串无法解决的报错了，multiqc不能指定位置安装，尴尬
+sudo apt-get update
+sudo apt-get install python3-pip
+# 默认安装，完美解决
+pip3 install  -i https://pypi.tuna.tsinghua.edu.cn/simple multiqc
+echo "export PATH=\$PATH:/home/cqs/.local/bin" >> ~/.bashrc
+source ~/.bashrc
+which multiqc
+
+
+
+#  *************************************************************************************************************************************
+
+## bcftools
+## Download and install bcftools
+## http://www.htslib.org/download/
+
+cd ~/biosoft
+mkdir bcftools-1.10.2 &&  cd bcftools-1.10.2
+wget https://github.com/samtools/bcftools/releases/download/1.10.2/bcftools-1.10.2.tar.bz2
+tar jxvf 
+cd bcftools-1.10.2/
+./configure --prefix=/home/cqs/biosoft/mybin
+make
+make install
+
+#  *************************************************************************************************************************************
+
+## tophat2
+# Download and install TopHat 
+# https://ccb.jhu.edu/software/tophat/index.shtml
+cd ~/biosoft
+mkdir -p tophat-2.1.1 && cd tophat-2.1.1
+#### readme: https://ccb.jhu.edu/software/tophat/manual.shtml
+wget http://ccb.jhu.edu/software/tophat/downloads/tophat-2.1.1.Linux_x86_64.tar.gz
+tar xzvf tophat-2.1.1.Linux_x86_64.tar.gz 
+ln -s tophat-2.1.1.Linux_x86_64 current
+
+
+#  *************************************************************************************************************************************
+
+## hisat2
+## Download and install HISAT 
+## https://daehwankimlab.github.io/hisat2/
+cd ~/biosoft
+mkdir hisat2-2.0.4 && cd hisat2-2.0.4
+#### readme: https://ccb.jhu.edu/software/hisat2/manual.shtml
+wget https://cloud.biohpc.swmed.edu/index.php/s/4pMgDq4oAF9QCfA/download
+
+unzip hisat2-2.0.4-Linux_x86_64.zip
+ln -s hisat2-2.0.4  current 
+## ~/biosoft/HISAT/current/hisat2-build
+## ~/biosoft/HISAT/current/hisat2  
+
+
+#  *************************************************************************************************************************************
+
+## HTSeq
+cd ~/biosoft
+mkdir HTSeq &&  cd HTSeq
+wget https://files.pythonhosted.org/packages/c4/04/b9b0c5514dcd09e64481e8ebc242aef162646b6de956ffb44595d1de0f69/HTSeq-0.12.4.tar.gz
+chmod u+x HTSeq-0.12.4.tar.gz
+tar zxvf HTSeq-0.12.4.tar.gz
+ls
+cd HTSeq-0.12.4/
+python setup.py install
+# 如报错如下：
+# symlinking folders for python3
+# Setup script for HTSeq: Failed to import 'numpy'.
+# Please install numpy and then try again to install HTSeq.
+# 解决方案：sudo apt-get install build-essential python2.7-dev python-numpy python-matplotlib
+# 如果报错
+pip3 install  -i https://pypi.tuna.tsinghua.edu.cn/simple Cython pysam matplotlib HTseq
+sudo python setup.py install
+# 找到htseq-count位置
+which htseq-count
+# /usr/local/bin/htseq-count
+/usr/local/bin/htseq-count --help
+echo "export PATH=\$PATH:/usr/local/bin/htseq-count" >> ~/.bashrc
+source ~/.bashrc
+htseq-count --help
+## ftp://ftp.sanger.ac.uk/pub/gencode/Gencode_mouse/release_M1/
+## http://hgdownload-test.cse.ucsc.edu/goldenPath/mm10/liftOver/
+## GRCm38/mm10 (Dec, 2011) 
+## ls *bam |while read id;do ( ~/.local/bin/htseq-count  -f bam  $id   genecode/mm9/gencode.vM1.annotation.gtf.gz  1>${id%%.*}.gene.counts ) ;done 
+## ls *bam |while read id;do ( ~/.local/bin/htseq-count  -f bam -i exon_id  $id   genecode/mm9/gencode.vM1.annotation.gtf.gz  1>${id%%.*}.exon.counts ) ;done
+
+#  *************************************************************************************************************************************
+
+# subread安装
+mkdir -p ~/biosoft/subread && cd ~/biosoft/subread
+wget https://nchc.dl.sourceforge.net/project/subread/subread-2.0.1/subread-2.0.1-source.tar.gz
+tar zxvf subread-2.0.1-source.tar.gz
+cd subread-2.0.1-source
+# 查看说明书
+cat ReadMe.txt
+cd src
+make -f Makefile.Linux
+cd ~/biosoft/subread/subread-2.0.1-source/bin
+./featureCounts
+echo "export PATH=\$PATH:/home/cqs/biosoft/subread/subread-2.0.1-source/bin" >> ~/.bashrc
+source ~/.bashrc
+featureCounts
+
+
+#  *************************************************************************************************************************************
+
+
+
+# SRA测序数据下载 
+# 我的笔记：https://www.jianshu.com/p/6819a16dee7a
+# PMID: 27824034
+# 文章地址：https://www.nature.com/articles/ncomms13347
+# 数据地址：GSE81916
+# 获得数据下载地址：
+
+# 下载方式1
+srapath SRR3589962
+# https://sra-downloadb.be-md.ncbi.nlm.nih.gov/sos2/sra-pub-run-7/SRR3589962/SRR3589962.1
+wget https://sra-downloadb.be-md.ncbi.nlm.nih.gov/sos2/sra-pub-run-7/SRR3589962/SRR3589962.1
+
+
+# 下载方式2 PREFETCH
+# 创建下载数据列表，将空格替换为换行符\n
+echo SRR35899{56..62} | sed 's/ /\n/g' > SRR_Acc_List.txt
+# 查看列表是否创建成功
+cat SRR_Acc_List.txt  
+# 创建一个简单的循环脚本
+vim prefetch.sh
+# 选择insert模式
+i
+# 输入脚本内容，注意 #!/bin/bash是脚本的第一行内容，意思是该脚本通过bash运行
+# 0、1和2分别表示标准输入、标准输出和标准错误信息输出，默认为标准输入，`1>$id.download.log 2>&1`表示将标准输入重定向到各ID对应的$id.download.log日志文件，并将错误信息也重定向至该文件
+# 
+#!/bin/bash
+cat SRR_Acc_List.txt | while read id;do prefetch  $id 1>$id.download.log 2>&1;done
+# 后台无挂断运行脚本
+nohup bash prefetch.sh &
+
+
+
+# 下载方式3 ASCP
+# ENA地址：https://www.ebi.ac.uk/ena/browser/view/
+# 检索关键词：PRJNA323422
+# 下载tsv文件
+# 获取fastq地址：
+# ascp使用绝对路径
+/home/caoqiansheng/.aspera/connect/bin/ascp -QT -l 300m -P33001 -i ~/.aspera/connect/etc/asperaweb_id_dsa.openssh era-fasp@fasp.sra.ebi.ac.uk:vol1/fastq/SRR358/002/SRR3589962/SRR3589962_2.fastq.gz .
+
+# 批量下载数据脚本
+for i in {56..62}
+do
+    a0='/home/caoqiansheng/.aspera/connect/bin/'
+    a1='ascp -QT -l 300m -P33001 -i ~/.aspera/connect/etc/asperaweb_id_dsa.openssh era-fasp@fasp.sra.ebi.ac.uk:vol1/fastq/SRR358/00'
+    a2=$(($i % 10))
+    a3='/SRR35899'$i
+    a4='_1.fastq.gz .'
+    a5='_2.fastq.gz .'
+    echo $a0$a1$a2$a3$a3$a4
+    echo $a0$a1$a2$a3$a3$a5
+done >> ascp.command
+# 后台运行脚本
+nohup bash ascp.command &
+
+
+# 参考基因组下载 https://www.jianshu.com/p/9f06c3efb000
+
+# genome index下载
+# 每个比对软件的index都不同，需要根据genome序列构建索引，也可以在官网进行下载，但是需要注意基因组版本号
+# hisat2 index下载网址 http://daehwankimlab.github.io/hisat2/download/
+# 找到M. musculus的下载链接如下，迅雷下载会更快
+wget https://genome-idx.s3.amazonaws.com/hisat/grcm38_genome.tar.gz
+
+
+# HISAT2比对
+for i in {59..62};do hisat2 -t -x /mnt/e/Work/bioinfo/public/index/mouse/hisat2/grcm38/genome -1 /mnt/e/Work/bioinfo/project/202009_RNAseq/data/SRR35899${i}_1.fastq.gz  -2 /mnt/e/Work/bioinfo/project/202009_RNAseq/data/SRR35899${i}_2.fastq.gz -S /mnt/e/Work/bioinfo/project/202009_RNAseq/result/align/20200910mouse/SRR35899${i}.sam;done
+
+# SAM文件转换为BAM
+for i in `seq 59 62`
+do
+samtools view -S SRR35899${i}.sam -b > SRR35899${i}.bam
+done
+
+# 对排序后的bam统计flagstat
+# 读取bam文件名，".bam"为删除
+# ls *.bam | while read id ;do echo basename ${id} ".bam";done
+# ls *.bam | while read id ;do echo $(basename ${id} ".bam").flagstat;done
+ls *.bam |while read id ;do (samtools flagstat -@ 1 $id > $(basename ${id} ".bam").flagstat );done
+mkdir flagstat && mv *.flagstat flagstat && cd flagstat
+multiqc ./
+
+# 构建shell文本处理脚本
+cat > stat.sh
+#!/bin/bash
+cat *.flagstat | awk '{print $1}' | paste - - - - - - - - - - - - - > file1
+# 77607517        16671207        0       0       75387881        60936310        30468155        30468155        56502696       57494864        1221810 832364  530657
+# 134310379       28365145        0       0       130964009       105945234       52972617        52972617        98979648       100621038       1977826 1398380 907493
+# 94264829        20737377        0       0       91921243        73527452        36763726        36763726        68525830       69723750        1460116 1023854 644490
+# 111681106       24075844        0       0       109169544       87605262        43802631        43802631        82145504       83390620        1703080 1013088 643888
+# 取行名
+cut -d"+" -f 2 SRR3589959.flagstat | cut -d" " -f 3-90 > file2
+# in total (QC-passed reads
+# secondary
+# supplementary
+# duplicates
+# mapped (97.14% : N/A)
+# paired in sequencing
+# read1
+# read2
+# properly paired (92.72% : N/A)
+# with itself and mate mapped
+# singletons (2.01% : N/A)
+# with mate mapped to a different chr
+# with mate mapped to a different chr (mapQ>=5)
+# 取列名
+ls *.flagstat | while read id ;do echo $(basename ${id} ".flagstat") ;done > file3
+# SRR3589959
+# SRR3589960
+# SRR3589961
+# SRR3589962
+paste file3 file1 > file4
+# 将file4行列转置
+awk '{
+    for (i=1;i<=NF;i++){
+        if (NR==1){
+            res[i]=$i
+        }
+        else{
+            res[i]=res[i]" "$i
+        }
+    }
+}END{
+    for(j=1;j<=NF;j++){
+        print res[j]
+    }
+}' file4 > file5
+# 在file2首行加入内容
+sed '1i Index' file2 > file6
+paste  file6 file5 > stat.txt
+rm file*
+# Enter，Ctrl+C后运行脚本
+bash stat.sh
+
+
+
+# 排序，索引
+for i in `seq 59 62`
+do
+samtools sort SRR35899${i}.bam -o SRR35899${i}_sorted.bam
+samtools index SRR35899${i}_sorted.bam
+done
+
+# 将SAM转换为BAM，并排序构建索引，随后删除SAM文件
+# for i in `seq 59 62`
+# do
+# samtools view -S SRR35899${i}.sam -b > SRR35899${i}.bam
+# samtools sort SRR35899${i}.bam -o SRR35899${i}_sorted.bam
+# samtools index SRR35899${i}_sorted.bam
+# done
+# rm *.sam
+
+# 注释
+for i in {59..62}
+do 
+htseq-count -s no -f bam -r pos /mnt/e/Work/bioinfo/project/202009_RNAseq/result/align/20200910mouse/SRR35899${i}_sorted.bam /mnt/e/Work/bioinfo/public/Annotation/mouse/gencode/gencode.vM25.annotation.gff3 > /mnt/e/Work/bioinfo/project/202009_RNAseq/result/annotation/SRR35899${i}.count
+done
+
+# 代码运行报错
+# Please Install PySam to use the BAM_Reader Class (http://code.google.com/p/pysam/)Error occured when reading beginning of BAM file.
+  # No module named pysam
+  # [Exception type: ImportError, raised in __init__.py:1086]
+ 
+# 解决办法
+# 下载pysam源代码
+# 下载地址：https://pypi.org/project/pysam/#files
+# 复制下载链接放入迅雷：https://files.pythonhosted.org/packages/99/5a/fc440eb5fffb5346e61a38b49991aa552e4b8b31e8493a101d2833ed1e19/pysam-0.16.0.1.tar.gz
+cd ~/biosoft
+mkdir pysam &&  cd pysam
+wget https://files.pythonhosted.org/packages/99/5a/fc440eb5fffb5346e61a38b49991aa552e4b8b31e8493a101d2833ed1e19/pysam-0.16.0.1.tar.gz
+tar zxvf pysam-0.16.0.1.tar.gz
+cd pysam-0.16.0.1
+python setup.py install
+# 报错
+# Traceback (most recent call last):
+# File "setup.py", line 24, in <module>
+# from setuptools import setup, find_packages
+# ImportError: No module named setuptools
+# python2环境下安装setuptools
+sudo apt-get install python-setuptools
+# python3环境下安装setuptools
+sudo apt-get install python3-setuptools
+# 再次执行安装
+sudo python setup.py install
+
+# 再次运行注释
+# 构建脚本
+cat > annotation.sh
+#!/bin/bash
+for i in {59..62}
+do 
+# .sorted.bam地址
+input="/mnt/e/Work/bioinfo/project/202009_RNAseq/result/align/20200910mouse/SRR35899${i}_sorted.bam"
+# .gtf地址
+annotation="/mnt/e/Work/bioinfo/public/Annotation/mouse/gencode/gencode.vM25.annotation.gff3"
+# 输出文件地址
+output="/mnt/e/Work/bioinfo/project/202009_RNAseq/result/annotation"
+htseq-count -s no -f bam -r pos ${input} ${annotation} > ${output}/SRR35899${i}.count
+done 
+# 运行
+bash annotation.sh
+
+
+# featureCounts计数
+featureCounts -p -t exon -g gene_id -a /mnt/e/Work/bioinfo/public/Annotation/mouse/gencode/gencode.vM25.annotation.gff3 -o /mnt/e/Work/bioinfo/project/202009_RNAseq/result/count/all.id.txt /mnt/e/Work/bioinfo/project/202009_RNAseq/result/align/20200910mouse/SRR35899{59..62}_sorted.bam
+
+# 运行后报错
+# featurecounts segmentation fault (core dumped)
+# 解决办法
+# 下载二进制版本subread
+rm -rf ~/biosoft/subread
+mkdir -p ~/biosoft/subread && cd ~/biosoft/subread
+wget https://nchc.dl.sourceforge.net/project/subread/subread-2.0.1/subread-2.0.1-Linux-x86_64.tar.gz
+tar zxvf subread-2.0.1-Linux-x86_64.tar.gz
+cd subread-2.0.1-Linux-x86_64
+cd ~/biosoft/subread/subread-2.0.1-Linux-x86_64/bin
+./featureCounts
+echo "export PATH=\$PATH:/home/cqs/biosoft/subread/subread-2.0.1-Linux-x86_64/bin" >> ~/.bashrc
+source ~/.bashrc
+featureCounts
+
+# 再次运行代码
+featureCounts -p -t exon -g gene_id -a /mnt/e/Work/bioinfo/public/Annotation/mouse/gencode/gencode.vM25.annotation.gff3 -o /mnt/e/Work/bioinfo/project/202009_RNAseq/result/count/all.id.txt /mnt/e/Work/bioinfo/project/202009_RNAseq/result/align/20200910mouse/SRR35899{59..62}_sorted.bam
+
+# 对all.id.txt.summary进行multiqc，查看Counts质控
+multiqc ./all.id.txt.summary
+# [INFO   ]         multiqc : This is MultiQC v1.9
+# [INFO   ]         multiqc : Template    : default
+# [INFO   ]         multiqc : Searching   : /mnt/e/Work/bioinfo/project/202009_RNAseq/result/count/all.id.txt.summary
+# Searching 1 files..  [####################################]  100%
+# [INFO   ]  feature_counts : Found 4 reports
+# [INFO   ]         multiqc : Compressing plot data
+# [INFO   ]         multiqc : Report      : multiqc_report.html
+# [INFO   ]         multiqc : Data        : multiqc_data
+# [INFO   ]         multiqc : MultiQC complete

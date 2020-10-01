@@ -1,0 +1,92 @@
+##络新妇基因家族分析
+#download reference protein sequences from NCBI, such GST famiy
+在网上下载参考物种的蛋白序列，注意，此时的蛋白序列一定是已经模式物种，经过了手工注释矫正过的。
+这些蛋白里边如果有可变剪切体，只留最长的那个即可。
+
+p450.ref.fasta
+#####cat p450.ref.fasta | awk '/^>/{print ">protein" ++i; next}{print}' | seqkit seq -u -w 0 | seqkit replace -p .+ -r "protein{nr}" --nr-width 3 > P450.ref.fa
+
+#blastp-like search against proteinsDB
+##mmseqs easy-search p450.ref.fasta genome.fa blastp.out tmp -s 7.5 --alignment-mode 3 --num-iterations 4 -e 0.001 --format-mode 2
+
+
+#erect query and target DB
+mmseqs createdb genome.fa genomeDB
+mmseqs createdb proteins.fa proteinsDB
+
+
+#erect index file for the targetDB
+mmseqs createindex genomeDB tmp
+mmseqs createindex proteinsDB tmp
+
+cd p450
+mmseqs createdb ../p450.ref.fa queryDB
+cd p450/AA
+mmseqs search ../queryDB ../../proteinsDB result_AADB tmp -s 7.5 --alignment-mode 3 --num-iterations 4 -e 0.001     #(-e   10     1e-5), -min-seq-id 0.5  
+mmseqs convertalis ../queryDB ../../proteinsDB result_AADB blastp.out --format-mode 2 
+cat blastp.out | awk '{print $2}' | sort | uniq > blastp.AA.list
+cat ../../proteins.fa | seqkit grep -f blastp.AA.list | seqkit seq -w 0 > blastp.AA.fa
+cd-hit -i blastp.AA.fa -o blastp.AA.cdhit95.fa -c 0.95 -n 5 -M 12000 -d 0 -T 8  #0.99 for p450 and very conserved genes
+
+
+
+#check sequences too short or too long, 40 remaining
+
+#check GSTs by HMMER3 search (cutoff E-value = 0.001) using the Pfam database to confirm conserved domains (online or local interproscan)
+interproscan.sh -dp -b blastp.AA.interproscan -f TSV -iprlookup -t p -cpu 15 -i blastp.AA.fa -appl Pfam
+#HMMER-Pfam results were further checked by blastp in the nonredundant GenBank protein database.
+cat blastp.AA.interproscan.tsv | grep "Cytochrome P450" | awk '{print $1}' | sort | uniq > hmmer-pfam.list
+cat blastp.AA.fa | seqkit grep -f hmmer-pfam.list | seqkit seq -u -w 0 > hmmer-pfam.fa
+cd-hit -i hmmer-pfam.fa -o hmmer-pfam.cdhit99.fa -c 0.99 -n 5 -M 12000 -T 16
+
+
+#tblatn-like search against genomeDB using mmseq2
+cd P450/genome
+mmseqs search ../queryDB ../../genomeDB result_genomeDB tmp -s 7.5 --alignment-mode 3 --num-iterations 4 -e 10
+mmseqs convertalis ../queryDB ../../genomeDB result_genomeDB tblastn.out --format-output 'query,target,qstart,qend,qlen,tstart,tend,tlen,evalue,alnlen,pident,qaln,taln'
+
+#mmseqs easy-search template.fasta genome.picauta_chinensis.fa tblastn_aln.cce tmp -s 7.5 --alignment-mode 3 --num-iterations 4 -e 0.001 --format-output    'query,target,evalue,pident,nident,qstart,qend,qlen,tstart,tend,tlen,alnlen,mismatch,bits,qcov,tcov,qframe,tframe,qaln,taln'
+
+#sort by target, qstart and length using excel or csvtk
+cat tblastn.out | csvtk sort -H -t -k2 -k6:n -k9:n | nl -b a -n rz | sed "s/^/>/g" > tblastn.temp1
+#reduce the multi-hits to the same gene region
+cat tblastn.temp1 | awk '{print $1,$14}' | sed "s/-//g" | sed "s/ /\n/g" > tblastn.temp2.fa
+cd-hit -i tblastn.temp2.fa -o tblastn.temp2.cdhit99.fa -c 0.99 -n 5 -M 12000 -T 8
+cat tblastn.temp2.cdhit99.fa | grep ">" | sed "s/>//g" | sort > tblastn.temp3.list
+for list in $(cat tblastn.temp3.list); do cat tblastn.temp1 | grep ">$list" >> tblastn.temp4;done 
+#delete invalid matches
+#filter the identical regions matching p450 prodicted from annotated proteins 
+mmseqs easy-search tblastn.temp2.cdhit99.fa ../AA/blastp.AA.cdhit95.fa tblastn.blastp.out tmp -s 7.5 --alignment-mode 3 -e 0.001 --format-output 'query,target,qstart,qend,qlen,tstart,tend,tlen,evalue,alnlen,pident,qaln,taln' --min-seq-id 0.9   #0.99 for CSP
+cat tblastn.blastp.out | awk '{print $1}' | sort | uniq > matched.list
+for list in $(cat matched.list); do sed -i "s/>"$list"/>"$list"***/g" tblastn.temp4; done
+
+#manually merge exons(眼睛看，不要用程序，这个程序不行)
+cat ../genome.fa | seqkit grep -r -p "Sexi_chr31" | seqkit subseq -r 7359364:7359604 | seqkit seq -w 0 > test.fasta
+#accurately determine Reading frames and intron/exon boundaries
+#align candidates to annotated proteins or use tools GeneWise, exonerate or GenomeThreader
+gth -xmlout -o gth.xml -genomic test.fasta -protein ../Bmori_GST.fasta -cdna transcripts.fa
+cat gth.xml | grep "<predicted_protein_sequence>" | sed "s/<predicted_protein_sequence>//g" | sed "s/<\/predicted_protein_sequence>//g" >> test.aa.fasta
+
+#compare newly preidicted genes to AA
+mmseqs easy-search unmatched.fa ../AA/blastp.AA.cdhit95.fa unmatched.blastp.out tmp -s 7.5 --alignment-mode 3 -e 0.001 --format-output 'query,target,qstart,qend,qlen,tstart,tend,tlen,evalue,alnlen,pident,qaln,taln'
+cd ..
+cat genome/unmatched.fa AA/blastp.AA.cdhit95.fa > P450.fa   # totally
+#cd-hit -i P450s.fa -o P450s.cdhit95.fa -c 0.95 -n 5 -M 12000 -T 8
+
+
+cat P450.fa | awk '/^>/{print ">protein" ++i; next}{print}' | seqkit seq -u -w 0 | seqkit replace -p .+ -r "protein{nr}" --nr-width 3 > P450.Tan.fa
+
+
+#check their positions on chromosomes
+cd tree
+#cat ../CCEs.fa | sed "s/ protein /_protein_/g" | sed "s/_protein_Name/ /g" > CCEs.fa
+linsi --thread 8 ../ABCs.fa > ABC.mafft.fas
+trimal -in ABC.mafft.fas -out ABC.trim.fas -automated1
+iqtree -s input.fas -mset LG -bb 1000 -nt AUTO
+
+
+
+
+mmseqs easy-search ../ABCs.fa ../../genome.fa blastp.out tmp -s 7.5 --alignment-mode 3 -e 0.001 --format-output 'query,target,qstart,qend,qlen,tstart,tend,tlen,evalue,alnlen,pident,qaln,taln' --min-seq-id 0.9
+
+
