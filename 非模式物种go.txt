@@ -1,0 +1,184 @@
+
+(一般eggnog是用的蛋白序列哈)
+##由于提供给我的是symbol,我需要转换成gid
+cat GCF_905147795.1_ilPieRapa1.1_protein.fna |grep '>'|grep 'LOC'|cut -d  ')' -f1 |cut -d ' ' -f1 >c1 ##GID
+cat GCF_905147795.1_ilPieRapa1.1_protein.fna |grep '>'|grep 'LOC'|cut -d  ')' -f1 |cut -d '(' -f2 >c2 ##SYMBOL
+paste -d '\t' c1 c2 >GID2LOC
+sed -i 's/>//g' GID2LOC
+##以GID为库，把提供的SYMBOL转换为GID
+运用test.py脚本转换
+
+
+cat out.txt |sed '/^$/d'|cut -d '	' -f1|sort|uniq >1369_LOC1
+cat out.txt |sed '/^$/d'|cut -d '	' -f2|sort|uniq >780_SYMBOL1
+
+cat out.txt |sed '/^$/d'|awk '{print $1}' |sort|uniq >1109_LOC2
+cat out.txt |sed '/^$/d'|awk '{print $2}' |sort|uniq >632_SYMBOL2
+
+
+
+
+
+
+
+library(tidyverse)                                                                         
+library(clusterProfiler)                                                  
+library(dplyr) 
+library(ggplot2)
+library(magrittr)
+library(readr)
+##非模式物种
+step1:注释
+把本物种的蛋白序列用diamond到eggnog数据库比对
+##/home/lx_sky6/software/eggnog-mapper-2.1.8/emapper.py -i GCF_905147795.1_ilPieRapa1.1_protein.faa -m diamond -o eggnog --cpu 60
+##拿到eggnog的注释结果记得吧以#开头的行全部删掉
+step2:构建自己的物种数据库
+eggnogmapper<- read_delim(
+  file = 'eggnog.emapper.annotations',
+  "\t",
+  escape_double =FALSE,
+  col_names=FALSE,
+  comment = "#",trim_ws = TRUE)%>%
+  dplyr::select(GID=X1,
+                SYMBOL=X9,
+                GO=X10,
+                KO=X12,
+                Pathway=X13,
+                OG=X7,
+                Gene_Name=X21)
+gene_info <- dplyr::select(eggnogmapper,  GID, Gene_Name) %>%
+  dplyr::filter(!is.na(Gene_Name))
+# 提取GO信息
+gene2go <- dplyr::select(eggnogmapper, GID, GO) %>%
+  separate_rows(GO, sep = ',', convert = F) %>%
+  filter(!is.na(GO)) %>%
+  mutate(EVIDENCE = 'IEA')
+gene2go <- subset(gene2go,grepl("^.*GO.*$",GO))
+
+
+# 构建 OrgDB,参数十分玄学，请按照以下格式
+library(AnnotationForge)
+AnnotationForge::makeOrgPackage(gene_info=gene_info,
+                                               go=gene2go,
+                                               maintainer='yuantao <909474045@qq.com>',
+                                               author='yuantao',
+                                               outputDir="/home/lx_sky6/yt/rworkplace",
+                                               tax_id=64459,
+                                               genus='Pieris',                     #只改动这里
+                                               species='rapae',               #和这里，进行命名
+                                               goTable="go",
+                                               version="1.0")
+
+
+##打包
+pkgbuild::build('/home/lx_sky6/yt/rworkplace/org.Prapae.eg.db', dest_path = "/home/lx_sky6/yt/anita/GOdb/")       #这两个路径自己创建
+
+##创建文件夹
+dir.create('R_Library',recursive = T)
+##安装
+install.packages("/home/lx_sky6/yt/anita/GOdb/org.Prapae.eg.db_1.0.tar.gz", repos = NULL,lib = 'R_Library/')
+
+library(org.Prapae.eg.db,lib.loc = 'R_Library/')
+columns(org.Prapae.eg.db)
+k =keys(org.Prapae.eg.db, keytype = 'SYMBOL')
+k
+
+
+
+
+
+fuji1_gene <- read_table2("915/1loc.gid")
+gene <- pull(fuji1_gene, GID)
+head(gene)
+ego <- enrichGO(gene = gene,
+                   OrgDb = ath,
+                   keyType = 'GID',
+                   ont = 'ALL',
+                   qvalueCutoff = 0.05,
+                   pvalueCutoff = 0.05)
+ego_df <- as.data.frame(ego)
+enrichplot::dotplot(ego,showCategory = 20)
+
+
+##run__KEGG富集 
+pathway2gene <- dplyr::select(eggnogmapper, Pathway, GID) %>%
+  separate_rows(Pathway, sep = ',', convert = F) %>%
+  filter(str_detect(Pathway, 'ko')) %>%
+  mutate(Pathway = str_remove(Pathway, 'ko'))
+library(magrittr)
+get_path2name <- function(){
+  keggpathid2name.df <- clusterProfiler:::kegg_list("pathway")
+  keggpathid2name.df[,1] %<>% gsub("path:map", "", .)
+  colnames(keggpathid2name.df) <- c("path_id","path_name")
+  return(keggpathid2name.df)
+}
+pathway2name <- get_path2name()
+library(clusterProfiler)
+de_ekp <- enricher(de_gene,
+                   TERM2GENE = pathway2gene,
+                   TERM2NAME = pathway2name,
+                   pvalueCutoff = 0.05,
+                   qvalueCutoff = 0.05)
+de_ekp_df <- as.data.frame(de_ekp)
+head(de_ekp_df)
+enrichplot::dotplot(de_ekp, showCategory = 20)
+##导出数据
+write.table(de_ego_df,file = '/home/lx_sky6/yt/rworkplace/914_GO.csv',sep = ',',quote = FALSE)
+
+write.table(de_ekp_df,file = '/home/lx_sky6/yt/rworkplace/914_Kegg.csv',sep = ',',quote = FALSE)
+
+
+##fuji2.txt
+188
+fuji2_gene <- read_table2("../anita/fuji2.txt")
+de_gene <- pull(fuji2_gene, GID)
+de_ego <- enrichGO(gene = de_gene,
+                   OrgDb = org.Prapae.eg.db,
+                   keyType = 'GID',
+                   ont = 'ALL',
+                   qvalueCutoff = 0.5,
+                   pvalueCutoff = 0.05)
+de_ego_df <- as.data.frame(de_ego)
+enrichplot::dotplot(de_ego,showCategory = 20)
+
+
+##run__KEGG富集 
+pathway2gene <- dplyr::select(eggnogmapper, Pathway, GID) %>%
+  separate_rows(Pathway, sep = ',', convert = F) %>%
+  filter(str_detect(Pathway, 'ko')) %>%
+  mutate(Pathway = str_remove(Pathway, 'ko'))
+library(magrittr)
+get_path2name <- function(){
+  keggpathid2name.df <- clusterProfiler:::kegg_list("pathway")
+  keggpathid2name.df[,1] %<>% gsub("path:map", "", .)
+  colnames(keggpathid2name.df) <- c("path_id","path_name")
+  return(keggpathid2name.df)
+}
+pathway2name <- get_path2name()
+library(clusterProfiler)
+de_ekp <- enricher(de_gene,
+                   TERM2GENE = pathway2gene,
+                   TERM2NAME = pathway2name,
+                   pvalueCutoff = 0.05,
+                   qvalueCutoff = 0.05)
+de_ekp_df <- as.data.frame(de_ekp)
+head(de_ekp_df)
+enrichplot::dotplot(de_ekp, showCategory = 20)
+##导出数据
+write.table(de_ego_df,file = '/home/lx_sky6/yt/rworkplace/914_fuji2GO.csv',sep = ',',quote = FALSE)
+
+write.table(de_ekp_df,file = '/home/lx_sky6/yt/rworkplace/914_fuji2Kegg.csv',sep = ',',quote = FALSE)
+
+>XP_045486635.1 uncharacterized protein LOC110993864 isoform X1 [Pieris rapae]
+>XP_045486636.1 uncharacterized protein LOC110993864 isoform X1 [Pieris rapae]
+>XP_045486637.1 uncharacterized protein LOC110993864 isoform X2 [Pieris rapae]
+>XP_045486638.1 uncharacterized protein LOC110993864 isoform X3 [Pieris rapae]
+>XP_045486639.1 uncharacterized protein LOC110993864 isoform X4 [Pieris rapae]
+>XP_045486640.1 uncharacterized protein LOC110993864 isoform X5 [Pieris rapae]
+>XP_045486641.1 uncharacterized protein LOC110993864 isoform X6 [Pieris rapae]
+>XP_045486642.1 uncharacterized protein LOC110993864 isoform X7 [Pieris rapae]
+>XP_045486643.1 uncharacterized protein LOC110993864 isoform X8 [Pieris rapae]
+>XP_045486644.1 uncharacterized protein LOC110993864 isoform X9 [Pieris rapae]
+>XP_045486645.1 uncharacterized protein LOC111004225 isoform X2 [Pieris rapae]
+>XP_045486646.1 metaxin-2 isoform X4 [Pieris rapae]
+>XP_045486647.1 uncharacterized protein LOC111004225 isoform X5 [Pieris rapae]

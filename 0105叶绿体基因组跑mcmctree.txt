@@ -1,0 +1,145 @@
+##需要的文件
+1.带有话是标定点的物种树
+2.比对好的phylip格式序列文件
+
+##化石标定点物种树(删除不需要的枝长等信息)
+___________________________________________________________
+ 86 1
+
+(((((((((((((((((Distichlis_spicata,Distichlis_littoralis),Distichlis_bajaensis),((Bouteloua_dactyloides,Bouteloua_curtipendula),Bouteloua_gracilis)),(Hilaria_cenchroides,Hilaria_rigida)),(Muhlenbergia_huegelii,Muhlenbergia_japonica)),Tragus_berteronianus),Tridens_brasiliensis),((((((Oropetium_thomaeum,Oropetium_aristatum),Tripogon_chinensis),Tripogonella_loliiformis),Melanocenchris_abyssinica),Desmostachya_bipinnata),Halopyrum_mucronatum)),(((((Perotis_indica,Perotis_rara),Perotis_hildebrandtii),(Trichoneura_grandiglumis,Trichoneura_ciliata)),Vaseyochloa_multinervosa),((Dactyloctenium_radulans,Dactyloctenium_aegyptium),Odyssea_paucinervis))),((Orinus_thoroldii,Triodia_rigidissima),Cleistogenes_squarrosa)),(((((((((((Cynodon_radiatus,Cynodon_dactylon),Eustachys_glauca),(Microchloa_indica,Oxychloris_scariosa)),Lepturus_repens),((((Chloris_virgata,Enteropogon_dolichostachyus),Chloris_truncata),Chloris_barbata),Enteropogon_ramosus)),Astrebla_pectinata),(Eleusine_coracana,Eleusine_indica)),((Dinebra_retroflexa,Dinebra_panicea),Dinebra_chinensis)),Acrachne_racemosa),Diplachne_fusca),((Aeluropus_lagopoides,Aeluropus_littoralis),Aeluropus_sinensis))),((((((((Sporobolus_alterniflorus,Sporobolus_maritimus),Sporobolus_michauxianus),Sporobolus_heterolepis),Sporobolus_maximus),((Sporobolus_virginicus,Sporobolus_helvolus),Sporobolus_aculeatus)),(Sporobolus_fertilis,Sporobolus_diandrus)),Urochondra_setulosa),(((Zoysia_matrella,Zoysia_pacifica),(Zoysia_japonica,Zoysia_sinica)),(Zoysia_macrostachya,Zoysia_macrantha)))‘>29.49<32.28’),((((((Eragrostis_cilianensis,Eragrostis_pilosa),Eragrostis_ferruginea),(Eragrostis_minor,Eragrostis_autumnalis)),(Eragrostis_atrovirens,Harpachne_harpachnoides)),(Tetrachne_dregei,Uniola_paniculata)),(Enneapogon_desvauxii,Schmidtia_pappophoroides))'>32.76<35.29'),(Triraphis_mollis,Neyraudia_reynaudiana)),Centropodia_glauca)'>42.87<43',Coelachyrum_piercei),Cortaderia_selloana)‘>54.44<63.35’;
+_______________________________________________________________
+
+##准备phylip格式序列文件
+-——-————————————————————————————————————
+例如：Zoysia_sinica.fasta序列内部名字为
+>gi|1642520764|ref|NC_042187.1| Zoysia sinica chloroplast, complete genome
+GAAATACCCAATATCCTGTTGGAACAAGATATTGGGTATTTCTGGCTTTCCTTCCTTTAAAAATTCCTAT
+ATTTTAGGAGAAAAACCTTATCCATTAAGAGATGGAACTTCAAGAGCAGCTAAGTCTAGAGGGAAGTTGT
+GAGCATTACGTTCGTGCATTACTTCCATACCAAGATTAGCACGGTTGATGATATCAGCCCAAGTATTAAT
+——————————————————————————————————————
+
+##修改fa文件内部序列名字和外部名字不统一
+cat *.fasta| sed 's/.fasta//g' >species.list
+for species in $(cat species.list); do cat ./$species.fasta | seqkit seq -n | awk '{print $1}' | sed "s/gi.*/$species/g" > t1; cat ./$species.fasta | seqkit seq -s -w 0 > t2; paste t1 t2 | seqkit tab2fx | seqkit seq -w 0 > $species.fas; rm t1 t2; done
+
+##比对
+/home/lx_sky6/yt/soft/miniconda3/bin/mafft --thread 30 86.fas > 86.mafft.fas
+
+##裁剪保存为phylip_paml格式
+trimal -in 86.mafft.fas -out 86.trimal.fas -automated1 -phylip_paml
+
+##运行mcmctree（一共运行3次，第一次输出out.BV文件）
+mcmctree mcmctree.ctl
+_______________________________________
+          seed = -1
+       seqfile = /home/lx_sky6/yt/0105_xianyu/0105_mcmc/86.trimal.phy
+      treefile = /home/lx_sky6/yt/0105_xianyu/0105_mcmc/input.tree
+       outfile = out.txt
+
+         ndata = 1
+       seqtype = 0  * 0: nucleotides; 1:codons; 2:AAs
+       usedata = 3    * 0: no data; 1:seq like; 2:use in.BV; 3: out.BV
+         clock = 2    * 1: global clock; 2: independent rates; 3: correlated rates
+       RootAge =   * safe constraint on root age, used if no fossil for root.
+
+         model = 7    * 0:JC69, 1:K80, 2:F81, 3:F84, 4:HKY85
+         alpha = 0.5    * alpha for gamma rates at sites
+         ncatG = 5    * No. categories in discrete gamma
+
+     cleandata = 0    * remove sites with ambiguity data (1:yes, 0:no)?
+
+       BDparas = 1 1 0    * birth, death, sampling
+   kappa_gamma = 6 2      * gamma prior for kappa
+   alpha_gamma = 1 1      * gamma prior for alpha
+
+   rgene_gamma = 2 2   * gamma prior for overall rates for genes
+  sigma2_gamma = 1 10   * gamma prior for sigma^2     (for clock=2 or 3)
+
+      finetune = 1: .1  .1  .1  .1 .01 .5  * auto (0 or 1) : times, musigma2, rates, mixing, paras, FossilErr
+
+         print = 1
+        burnin = 10000
+      sampfreq = 5
+       nsample = 30000
+
+*** Note: Make your window wider (100 columns) before running the program.
+______________________________________________________
+
+##再次运行mcmctree（第二次修改out.BV为in.BV作为输入，即修改mcmctree.ctl文件中usedata = 2为usedata = 3）
+mv out.BV in.BV
+mcmctree mcmctree.ctl
+_______________________________________________
+          seed = -1
+       seqfile = /home/lx_sky6/yt/0105_xianyu/0105_mcmc/86.trimal.phy
+      treefile = /home/lx_sky6/yt/0105_xianyu/0105_mcmc/input.tree
+       outfile = out.txt
+
+         ndata = 1
+       seqtype = 0  * 0: nucleotides; 1:codons; 2:AAs
+       usedata = 2    * 0: no data; 1:seq like; 2:use in.BV; 3: out.BV
+         clock = 2    * 1: global clock; 2: independent rates; 3: correlated rates
+       RootAge =   * safe constraint on root age, used if no fossil for root.
+
+         model = 7    * 0:JC69, 1:K80, 2:F81, 3:F84, 4:HKY85
+         alpha = 0.5    * alpha for gamma rates at sites
+         ncatG = 5    * No. categories in discrete gamma
+
+     cleandata = 0    * remove sites with ambiguity data (1:yes, 0:no)?
+
+       BDparas = 1 1 0    * birth, death, sampling
+   kappa_gamma = 6 2      * gamma prior for kappa
+   alpha_gamma = 1 1      * gamma prior for alpha
+
+   rgene_gamma = 2 2   * gamma prior for overall rates for genes
+  sigma2_gamma = 1 10   * gamma prior for sigma^2     (for clock=2 or 3)
+
+      finetune = 1: .1  .1  .1  .1 .01 .5  * auto (0 or 1) : times, musigma2, rates, mixing, paras, FossilErr
+
+         print = 1
+        burnin = 10000
+      sampfreq = 5
+       nsample = 30000
+
+*** Note: Make your window wider (100 columns) before running the program.
+---------------------------------------------------------------------------------------------------
+
+##再次运行mcmctree（第3次相对于第二次不做修改）
+mv out.BV in.BV
+mcmctree mcmctree.ctl
+_______________________________________________
+          seed = -1
+       seqfile = /home/lx_sky6/yt/0105_xianyu/0105_mcmc/86.trimal.phy
+      treefile = /home/lx_sky6/yt/0105_xianyu/0105_mcmc/input.tree
+       outfile = out.txt
+
+         ndata = 1
+       seqtype = 0  * 0: nucleotides; 1:codons; 2:AAs
+       usedata = 2    * 0: no data; 1:seq like; 2:use in.BV; 3: out.BV
+         clock = 2    * 1: global clock; 2: independent rates; 3: correlated rates
+       RootAge =   * safe constraint on root age, used if no fossil for root.
+
+         model = 7    * 0:JC69, 1:K80, 2:F81, 3:F84, 4:HKY85
+         alpha = 0.5    * alpha for gamma rates at sites
+         ncatG = 5    * No. categories in discrete gamma
+
+     cleandata = 0    * remove sites with ambiguity data (1:yes, 0:no)?
+
+       BDparas = 1 1 0    * birth, death, sampling
+   kappa_gamma = 6 2      * gamma prior for kappa
+   alpha_gamma = 1 1      * gamma prior for alpha
+
+   rgene_gamma = 2 2   * gamma prior for overall rates for genes
+  sigma2_gamma = 1 10   * gamma prior for sigma^2     (for clock=2 or 3)
+
+      finetune = 1: .1  .1  .1  .1 .01 .5  * auto (0 or 1) : times, musigma2, rates, mixing, paras, FossilErr
+
+         print = 1
+        burnin = 10000
+      sampfreq = 5
+       nsample = 30000
+
+*** Note: Make your window wider (100 columns) before running the program.
+---------------------------------------------------------------------------------------------------
+
+##最后将第二次和第三次运行结果的mcmc.txt文件导入tracer软件，如果ess值均大于200，且两次结果差异不大，则认为树可信。
+

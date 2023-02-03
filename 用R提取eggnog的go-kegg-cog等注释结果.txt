@@ -1,0 +1,12 @@
+eggnogmapper<- read_delim( file = 'eggnog.emapper.annotations',"\t",escape_double =FALSE,col_names=FALSE,comment = "#",trim_ws = TRUE)%>%dplyr::select(GID=X1,COG=X7,SYMBOL=X9,GO=X10,KO=X12,Pathway=X13,OG=X7,Gene_Name=X21)
+Pathway2gene = dplyr::select(eggnogmapper,Pathway,GID) %>% separate_rows(Pathway, sep = ',',convert =F) %>% filter(str_detect(Pathway,'ko'))%>%mutate(Pathway=str_remove(Pathway,'ko'))
+write.csv(Pathway2gene,file ='/home/lx_sky6/yt/xny/Pathway2gene' )
+##cat Pathway2gene |cut -d ',' -f2,3|sed 's/"//g'|sed 's/,/ /g' >pathway2gene
+COG2gene = dplyr::select(eggnogmapper,COG,GID)%>% separate_rows(COG, sep = ',',convert =F) ##还需linux下面删除-的行
+write.csv(COG2gene,file ='/home/lx_sky6/yt/xny/COG2gene' )
+##cat COG2gene |cut -d ',' -f2,3|sed 's/"//g'|sed 's/,/ /g'|sed '/^-/d' >COGs2gene
+GO2gene = dplyr::select(eggnogmapper,GO,GID) %>% separate_rows(GO, sep = ',',convert =F) %>%mutate(Pathway=str_remove(GID,'GO:')) ##删除-的行
+write.csv(GO2gene,file ='/home/lx_sky6/yt/xny/GO2gene' )
+cat GO2gene |cut -d ',' -f2,3|sed 's/"//g'|sed 's/,/ /g'|sed '/^-/d' >GOs2gene
+
+ipscan <- read_delim(file = 'genome.iprscan.tsv',"\t",escape_double =FALSE,col_names=FALSE,trim_ws = TRUE)%>%dplyr::select(GID=X1,GO=X14,Pathway=X15)
