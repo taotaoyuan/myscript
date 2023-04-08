@@ -1,0 +1,36 @@
+###绘制GC3s图
+ENC<-function(x){
+  return(2 + x + 29/(x^2+(1-x)^2))
+}
+x <- seq(0,1,by=0.005)
+y <- ENC(x)
+df1<-data.frame(A=x,B=y)
+library(ggplot2)
+df <- read_delim("~/yt/20230106_baimaike/0105_YC_hifi/mito_assemble_script/0314_comparate-mito/6-code/txt", 
+                     "\t", escape_double = FALSE, trim_ws = TRUE)
+ggplot(df1,aes(x=A,y=B))+geom_line(size=1)+
+  geom_point(data=df,aes(x=GC3s,y=ENC))+xlim(0,1)+
+  ylim(0,70)+labs(x="GC3s",y="ENC")+theme_bw()
+
+
+ggplot(df1,aes(x=A,y=B))+geom_line(size=1)+
+  geom_point(data=df,aes(x=GC3s,y=ENC,color=gene))+xlim(0,1)+
+  ylim(0,70)+labs(x="GC3s",y="ENC")+theme_classic()+
+  geom_text(data=df,aes(x=GC3s,y=ENC,color=gene,label=gene))
+  theme(legend.position="none")
+
+
+ggplot(df1,aes(x=A,y=B))+geom_line(size=1)+
+  geom_point(data=df,aes(x=GC3s,y=ENC,color=gene))+xlim(0,1)+
+  ylim(0,70)+labs(x="GC3s",y="ENC")+theme_classic()+
+  geom_text_repel(data=df,aes(x=GC3s,y=ENC,color=gene,label=gene))
+  theme(legend.position="none")
+  
+  
+  
+  
+ggplot(df1,aes(x=A,y=B))+geom_line(size=1)+
+  geom_point(data=df,aes(x=GC3s,y=ENC,color=gene))+xlim(0,1)+
+  ylim(0,70)+labs(x="GC3s",y="ENC")+theme_classic()+
+  geom_text_repel(data=df,aes(x=GC3s,y=ENC,color=gene,label=gene),fontface="bold", color="black")
+  theme(legend.position="none")
